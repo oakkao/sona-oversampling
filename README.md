@@ -33,6 +33,7 @@ The SONA function generates synthetic samples for the minority class by identify
 
 ## Usage Example
 ```
+from sona_oversampling import SONA
 from sklearn.datasets import make_circles
 
 # Generate 'Double circle' dataset with imbalance
