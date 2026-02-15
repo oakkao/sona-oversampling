@@ -1,76 +1,76 @@
 from scipy.spatial.distance import cdist
 import numpy as np
 
-def SONA(X,y, min_label, new_label = 0):
-  X_gen_min = (X)[y== min_label]
-  X_gen_maj = (X)[y != min_label]
+def SONA(X, y, min_label, new_label=0):
+    X_gen_min = X[y == min_label]
+    X_gen_maj = X[y != min_label]
 
-  maj_size = len(X_gen_maj)
-  minor_size = len(X_gen_min)
+    maj_size = len(X_gen_maj)
+    minor_size = len(X_gen_min)
+    synthese_len = maj_size - minor_size
 
-  ## Negative border
-  dist_gen_maj2min= cdist(X_gen_maj, X_gen_min)
-  rank_dist_maj2min = np.argsort(dist_gen_maj2min)
+    if synthese_len <= 0:
+        return X, y
 
-  neg_border = np.zeros(len(X_gen_min))
-  for i in range(maj_size):
-    near_point = rank_dist_maj2min[i][0]
-    neg_border[near_point] += 1
+    # 1. Distance Matrices
+    dist_min2maj = cdist(X_gen_min, X_gen_maj)
+    
+    # 2. Identify Borders
+    closest_min_idx = np.argmin(dist_min2maj, axis=0)
+    neg_border = np.bincount(closest_min_idx, minlength=minor_size)
 
-  ## Positive border
-  dist_gen_min2maj = cdist(X_gen_min,X_gen_maj)
-  rank_dist_min2maj = np.argsort(dist_gen_min2maj)
+    # Find index of closest majority for each minority (Positive Border)
+    closest_maj_idx = np.argmin(dist_min2maj, axis=1)
+    pos_border = np.bincount(closest_maj_idx, minlength=maj_size)
 
-  pos_border = np.zeros(len(X_gen_maj))
-  for i in range(minor_size):
-    near_point = rank_dist_min2maj[i][0]
-    pos_border[near_point] += 1
 
-  ## Find radius
-  neg_radius = np.zeros(len(X_gen_min))
-  rank_dist_gen_pos = np.argsort(dist_gen_min2maj)
+    # 3. Calculate Radius
+    safe_maj_mask = (pos_border == 0)
+    if not np.any(safe_maj_mask):
+        neg_radius = np.min(dist_min2maj, axis=1)
+    else:
+        neg_radius = np.min(dist_min2maj[:, safe_maj_mask], axis=1)
 
-  for i in range(minor_size):
-    pos_list = rank_dist_gen_pos[i]
+    # 4. Sampling Probabilities
+    prop_min = 1.0 / (neg_border + 1.0)
+    prop_min /= prop_min.sum()
 
-    for j in range(maj_size):
-      pos_point = pos_list[j]
+    # 5. Generate Synthetic Samples
+    idx_i = np.random.choice(minor_size, size=synthese_len, p=prop_min)
+    X_i = X_gen_min[idx_i]
+    
+    # Pick neighbor points (j) for each i
+    dist_min2min = cdist(X_gen_min, X_gen_min)
+    
+    # Apply inverse distance weighting for neighbors
+    with np.errstate(divide='ignore'):
+        terminal_weights = 1.0 / dist_min2min
+    np.fill_diagonal(terminal_weights, 0) # Can't pick itself
+    terminal_weights = np.nan_to_num(terminal_weights, posinf=0)
+    
+    # Normalize each row to be a probability distribution
+    row_sums = terminal_weights.sum(axis=1, keepdims=True)
+    terminal_probs = terminal_weights / row_sums
 
-      if pos_border[pos_point] == 0:
-        neg_radius[i] = dist_gen_min2maj[i][pos_point]
-        break;
+    # For each selected i, pick a neighbor j
+    idx_j = [np.random.choice(minor_size, p=terminal_probs[i]) for i in idx_i]
+    X_j = X_gen_min[idx_j]
 
-  prop_min = 1 / (neg_border+1)
-  prop_min = prop_min / np.sum(prop_min)
-  # prop_min = neg_border / np.sum(neg_border)
+    # 6. Direction and Interpolation
+    diff = X_j - X_i
+    norm_v = np.linalg.norm(diff, axis=1, keepdims=True)
+    # Avoid division by zero for identical points
+    norm_v_safe = np.where(norm_v == 0, 1, norm_v)
+    
+    direction_vector = diff / norm_v_safe
+    alpha = np.random.random((synthese_len, 1))
+    
+    # Determine step size: min(radius of point i, distance to point j)
+    step_size = np.minimum(neg_radius[idx_i].reshape(-1, 1), norm_v)
+    
+    syn_samples = X_i + (alpha * direction_vector * step_size)
 
-  syn_list = []
-
-  dist_min2min = cdist(X_gen_min,X_gen_min)
-
-  synthese_len = maj_size - minor_size
-
-  for t in range(synthese_len):      # assume to 1:1
-    i = np.random.choice(len(X_gen_min), p = prop_min)
-
-    terminal_prop = 1/dist_min2min[i]
-    terminal_prop = np.nan_to_num(terminal_prop, nan=0, posinf=0, neginf=0) # Use np.nan_to_num
-    terminal_prop = terminal_prop / np.sum(terminal_prop) # equal smote
-    j = np.random.choice(len(X_gen_min), p = terminal_prop)
-
-    direction_vector =  X_gen_min[j] - X_gen_min[i]
-    norm_v = np.linalg.norm(direction_vector)
-    direction_vector = direction_vector / norm_v
-
-    alpha = np.random.random()
-
-    syn_x = X_gen_min[i] + alpha* direction_vector *min(neg_radius[i], norm_v)
-    syn_list.append(syn_x)
-
-  return (
-            np.vstack([X, syn_list]),
-            np.hstack([y, np.repeat(min_label + new_label, len(syn_list))]),
-        )
-
-def hello():
-  print("Hello")
+    return (
+        np.vstack([X, syn_samples]),
+        np.hstack([y, np.repeat(min_label + new_label, synthese_len)]),
+    )
