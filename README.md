@@ -34,44 +34,54 @@ The SONA function generates synthetic samples for the minority class by identify
 ## Usage Example
 ```
 from sona_oversampling import SONA
-from sklearn.datasets import make_circles
+from sklearn.datasets import make_circles, make_moons, make_blobs
 
 # Generate 'Double circle' dataset with imbalance
 X_circles, y_circles = make_circles(n_samples=(500, 100), noise=0.05, random_state=42)
 
-X_oversampled, y_oversampled = SONA(X_circles, y_circles, min_label= 1, new_label=1)
+# Generate 'Blue-moons' dataset with imbalance
+X_moons, y_moons = make_moons(n_samples=(500, 100), noise=0.1, random_state=42)
 
-## Visualization part
-# Original Majority (label 0)
-mask_maj = (y_oversampled == 0)
-# Original Minority (label 1)
-mask_min_orig = (y_oversampled == 1)
-# Synthetic Minority (label 1 + new_label 1 = 2)
-mask_min_syn = (y_oversampled == 2)
+# Generate imbalanced 'Gaussian cluster' dataset
+X_blobs, y_blobs = make_blobs(n_samples=[500, 50], cluster_std=0.5, centers=[[0, 0], [1, 1]], random_state=42)
 
-# 3. Create the plot
-plt.figure(figsize=(10, 8))
+synthetic_datasets = [
+    ("Double circle", (X_circles, y_circles)),
+    ("Blue-moons", (X_moons, y_moons)),
+    ("Gaussian cluster", (X_blobs, y_blobs))
+]
 
-# Plot Majority Class
-plt.scatter(X_oversampled[mask_maj, 0], X_oversampled[mask_maj, 1], 
-            c='grey', label='Majority Class (0)', alpha=0.5, s=20)
+for name, (X_original, y_original) in synthetic_datasets:
+  
+  X_oversampled, y_oversampled = SONA(X_original, y_original, min_label= 1, new_label=1)
+  mask_maj = (y_oversampled == 0)
+  mask_min_orig = (y_oversampled == 1)
+  mask_min_syn = (y_oversampled == 2)
 
-# Plot Original Minority Class
-plt.scatter(X_oversampled[mask_min_orig, 0], X_oversampled[mask_min_orig, 1], 
-            c='blue', label='Original Minority (1)', s=30, edgecolors='k')
+  plt.figure(figsize=(10, 8))
 
-# Plot Synthetic Minority Class
-plt.scatter(X_oversampled[mask_min_syn, 0], X_oversampled[mask_min_syn, 1], 
-            c='red', label='Synthetic Samples (2)', marker='x', s=40, alpha=0.8)
+  # Plot Majority Class
+  plt.scatter(X_oversampled[mask_maj, 0], X_oversampled[mask_maj, 1],
+              c='grey', label='Majority Class (0)', alpha=0.5, s=20)
 
-plt.title("SONA Oversampling: Double Circle Dataset", fontsize=14)
-plt.xlabel("Feature 1")
-plt.ylabel("Feature 2")
-plt.legend(loc='best')
-plt.grid(True, linestyle='--', alpha=0.6)
-plt.axis('equal') # Keeps the circles looking like circles
+  # Plot Original Minority Class
+  plt.scatter(X_oversampled[mask_min_orig, 0], X_oversampled[mask_min_orig, 1],
+              c='blue', label='Original Minority (1)', s=30, edgecolors='k')
 
-plt.show()
+  # Plot Synthetic Minority Class
+  plt.scatter(X_oversampled[mask_min_syn, 0], X_oversampled[mask_min_syn, 1],
+              c='red', label='Synthetic Samples (2)', marker='x', s=40, alpha=0.8)
+
+  plt.title(f"SONA Oversampling: {name} Dataset", fontsize=14)
+  plt.xlabel("Feature 1")
+  plt.ylabel("Feature 2")
+  plt.legend(loc='best')
+  plt.grid(True, linestyle='--', alpha=0.6)
+  plt.axis('equal')
+
+  plt.show()
 ```
 **Output**
-![Double circle](https://github.com/oakkao/sona-oversampling/blob/main/examples/SONA_circle.png?raw=true)
+![Double circles](https://github.com/oakkao/sona-oversampling/blob/main/examples/SONA_circle.png?raw=true)
+![Blue moons](https://github.com/oakkao/sona-oversampling/blob/main/examples/SONA_blue_moons.png?raw=true)
+![Gaussian clusters](https://github.com/oakkao/sona-oversampling/blob/main/examples/SONA_gaussian_cluster.png?raw=true)
