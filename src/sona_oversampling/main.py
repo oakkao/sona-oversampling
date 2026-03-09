@@ -68,7 +68,7 @@ def SONA(X, y, min_label, new_label=0):
     # Determine step size: min(radius of point i, distance to point j)
     step_size = np.minimum(neg_radius[idx_i].reshape(-1, 1), norm_v)
     
-    syn_samples = X_i + (alpha * direction_vector * step_size)
+    syn_samples = X_i + (alpha * direction_vector * step_size)/2.0
 
     return (
         np.vstack([X, syn_samples]),
